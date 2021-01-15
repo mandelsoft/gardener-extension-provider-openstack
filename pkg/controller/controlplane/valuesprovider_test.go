@@ -18,8 +18,6 @@ import (
 	"context"
 	"encoding/json"
 
-	api "github.com/gardener/gardener-extension-provider-openstack/pkg/apis/openstack"
-	"github.com/gardener/gardener-extension-provider-openstack/pkg/openstack"
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/controller/controlplane/genericactuator"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
@@ -27,6 +25,9 @@ import (
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	mockclient "github.com/gardener/gardener/pkg/mock/controller-runtime/client"
 	"github.com/gardener/gardener/pkg/utils"
+
+	api "github.com/gardener/gardener-extension-provider-openstack/pkg/apis/openstack"
+	"github.com/gardener/gardener-extension-provider-openstack/pkg/openstack"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
@@ -335,6 +336,79 @@ var _ = Describe("ValuesProvider", func() {
 							"name":              "default",
 							"floatingNetworkID": floatingNetworkID,
 							"floatingSubnetID":  floatingSubnetID,
+						},
+						{
+							"name":              "public",
+							"floatingNetworkID": floatingNetworkID,
+							"floatingSubnetID":  floatingSubnetID2,
+						},
+						{
+							"name":     "other",
+							"subnetID": subnetID,
+						},
+					},
+				})
+			)
+
+			values, err := vp.GetConfigChartValues(ctx, cp, clusterK8sLessThan119)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(values).To(Equal(configValues))
+		})
+
+		It("should return correct config chart values with load balancer classes and subnet pattern", func() {
+			c.EXPECT().Get(ctx, cpSecretKey, &corev1.Secret{}).DoAndReturn(clientGet(cpSecret))
+
+			var (
+				floatingNetworkID     = "4711"
+				fsid                  = "0815"
+				floatingSubnetID2     = "pub0815"
+				subnetID              = "priv"
+				floatingSubnetPattern = "default-floating-subnet-*"
+				cp                    = controlPlane(
+					floatingNetworkID,
+					&api.ControlPlaneConfig{
+						LoadBalancerProvider: "load-balancer-provider",
+						LoadBalancerClasses: []api.LoadBalancerClass{
+							{
+								Name:             "test",
+								FloatingSubnetID: &fsid,
+								SubnetID:         nil,
+							},
+							{
+								Name:                  "default",
+								FloatingSubnetPattern: &floatingSubnetPattern,
+								SubnetID:              nil,
+							},
+							{
+								Name:             "public",
+								FloatingSubnetID: &floatingSubnetID2,
+								SubnetID:         nil,
+							},
+							{
+								Name:     "other",
+								SubnetID: &subnetID,
+							},
+						},
+						CloudControllerManager: &api.CloudControllerManagerConfig{
+							FeatureGates: map[string]bool{
+								"CustomResourceValidation": true,
+							},
+						},
+					},
+				)
+
+				configValues = utils.MergeMaps(configChartValues, map[string]interface{}{
+					"floatingNetworkID":     floatingNetworkID,
+					"floatingSubnetPattern": floatingSubnetPattern,
+					"floatingClasses": []map[string]interface{}{
+						{
+							"name":              "test",
+							"floatingNetworkID": floatingNetworkID,
+							"floatingSubnetID":  fsid,
+						},
+						{
+							"name":                  "default",
+							"floatingSubnetPattern": floatingSubnetPattern,
 						},
 						{
 							"name":              "public",

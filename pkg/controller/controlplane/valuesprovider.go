@@ -20,10 +20,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	api "github.com/gardener/gardener-extension-provider-openstack/pkg/apis/openstack"
-	"github.com/gardener/gardener-extension-provider-openstack/pkg/apis/openstack/helper"
-	"github.com/gardener/gardener-extension-provider-openstack/pkg/openstack"
-	"github.com/gardener/gardener-extension-provider-openstack/pkg/utils"
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/controller/controlplane/genericactuator"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
@@ -34,6 +30,11 @@ import (
 	kutil "github.com/gardener/gardener/pkg/utils/kubernetes"
 	"github.com/gardener/gardener/pkg/utils/secrets"
 	"github.com/gardener/gardener/pkg/utils/version"
+
+	api "github.com/gardener/gardener-extension-provider-openstack/pkg/apis/openstack"
+	"github.com/gardener/gardener-extension-provider-openstack/pkg/apis/openstack/helper"
+	"github.com/gardener/gardener-extension-provider-openstack/pkg/openstack"
+	"github.com/gardener/gardener-extension-provider-openstack/pkg/utils"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -429,32 +430,38 @@ func getConfigChartValues(
 		"rescanBlockStorageOnResize": cloudProfileConfig.RescanBlockStorageOnResize != nil && *cloudProfileConfig.RescanBlockStorageOnResize,
 		"nodeVolumeAttachLimit":      cloudProfileConfig.NodeVolumeAttachLimit,
 	}
+	utils.SetStringValue(values, "floatingSubnetID", infraStatus.Networks.FloatingPool.SubnetID)
 
 	if cpConfig.LoadBalancerClasses == nil {
-		var fallback *api.FloatingPool
+		var fallback []api.LoadBalancerClass
 
 		for _, pool := range cloudProfileConfig.Constraints.FloatingPools {
-			if pool.Region == nil && fallback == nil && pool.Name == infraStatus.Networks.FloatingPool.Name {
-				v := pool
-				fallback = &v
-			}
+			if pool.Name == infraStatus.Networks.FloatingPool.Name {
+				if pool.Region == nil && fallback == nil {
+					fallback = pool.LoadBalancerClasses
+				}
 
-			if pool.Region != nil && *pool.Region == cp.Spec.Region && pool.Name == infraStatus.Networks.FloatingPool.Name {
-				cpConfig.LoadBalancerClasses = pool.LoadBalancerClasses
-				break
+				if pool.Region != nil && *pool.Region == cp.Spec.Region {
+					cpConfig.LoadBalancerClasses = pool.LoadBalancerClasses
+					break
+				}
 			}
 		}
 
-		if cpConfig.LoadBalancerClasses == nil && fallback != nil {
-			cpConfig.LoadBalancerClasses = fallback.LoadBalancerClasses
+		if cpConfig.LoadBalancerClasses == nil {
+			cpConfig.LoadBalancerClasses = fallback
 		}
 	}
 
-	for i, class := range cpConfig.LoadBalancerClasses {
-		if i == 0 || class.Name == api.DefaultLoadBalancerClass {
-			utils.SetStringValue(values, "floatingSubnetID", class.FloatingSubnetID)
-			utils.SetStringValue(values, "subnetID", class.SubnetID)
+	found := false
+	for _, class := range cpConfig.LoadBalancerClasses {
+		if class.Name == api.DefaultLoadBalancerClass {
+			found = true
+			setDefaultLoadbalancerSpec(values, &class)
 		}
+	}
+	if len(cpConfig.LoadBalancerClasses) > 0 && !found {
+		setDefaultLoadbalancerSpec(values, &cpConfig.LoadBalancerClasses[0])
 	}
 
 	for _, class := range cpConfig.LoadBalancerClasses {
@@ -474,6 +481,7 @@ func getConfigChartValues(
 			utils.SetStringValue(floatingClass, "floatingNetworkID", class.FloatingNetworkID)
 		}
 
+		utils.SetStringValue(floatingClass, "floatingSubnetPattern", class.FloatingSubnetPattern)
 		utils.SetStringValue(floatingClass, "floatingSubnetID", class.FloatingSubnetID)
 		utils.SetStringValue(floatingClass, "subnetID", class.SubnetID)
 
@@ -485,6 +493,13 @@ func getConfigChartValues(
 	}
 
 	return values, nil
+}
+
+// setDefaultLoadbalancerSpec completes the default spec according to a dedicated load balancer class
+func setDefaultLoadbalancerSpec(values map[string]interface{}, class *api.LoadBalancerClass) {
+	utils.SetStringValue(values, "floatingSubnetPattern", class.FloatingSubnetPattern)
+	utils.SetStringValue(values, "floatingSubnetID", class.FloatingSubnetID)
+	utils.SetStringValue(values, "subnetID", class.SubnetID)
 }
 
 // getControlPlaneChartValues collects and returns the control plane chart values.
