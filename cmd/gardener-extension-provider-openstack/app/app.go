@@ -177,9 +177,11 @@ func NewControllerManagerCommand(ctx context.Context) *cobra.Command {
 			reconcileOpts.Completed().Apply(&openstackworker.DefaultAddOptions.IgnoreOperationAnnotation)
 			workerCtrlOpts.Completed().Apply(&openstackworker.DefaultAddOptions.Controller)
 
-			if _, _, err := webhookOptions.Completed().AddToManager(mgr); err != nil {
+			_, shootWebhooks, err := webhookOptions.Completed().AddToManager(mgr)
+			if err != nil {
 				controllercmd.LogErrAndExit(err, "Could not add webhooks to manager")
 			}
+			openstackcontrolplane.DefaultAddOptions.ShootWebhooks = shootWebhooks
 
 			if err := controllerSwitches.Completed().AddToManager(mgr); err != nil {
 				controllercmd.LogErrAndExit(err, "Could not add controllers to manager")
