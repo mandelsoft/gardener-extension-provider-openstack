@@ -41,7 +41,7 @@ const (
 	// PrivateLoadBalancerClass defines the load balancer class used to default the private load balancers.
 	PrivateLoadBalancerClass = "private"
 	// VPNLoadBalancerClass defines the floating pool class used by the VPN service.
-	VPNLoadBalancerClass = "vpn"
+	VPNLoadBalancerClass = "gardener-vpn"
 )
 
 // CloudControllerManagerConfig contains configuration settings for the cloud-controller-manager.

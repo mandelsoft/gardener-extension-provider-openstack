@@ -432,47 +432,66 @@ func getConfigChartValues(
 	}
 	utils.SetStringValue(values, "floatingSubnetID", infraStatus.Networks.FloatingPool.SubnetID)
 
-	if cpConfig.LoadBalancerClasses == nil {
-		var fallback []api.LoadBalancerClass
+	// select matching set of classes from cloud profile
+	var profileClasses []api.LoadBalancerClass
+	for _, pool := range cloudProfileConfig.Constraints.FloatingPools {
+		if pool.Name == infraStatus.Networks.FloatingPool.Name {
+			if pool.Region == nil && profileClasses == nil {
+				profileClasses = pool.LoadBalancerClasses
+			}
 
-		for _, pool := range cloudProfileConfig.Constraints.FloatingPools {
-			if pool.Name == infraStatus.Networks.FloatingPool.Name {
-				if pool.Region == nil && fallback == nil {
-					fallback = pool.LoadBalancerClasses
-				}
-
-				if pool.Region != nil && *pool.Region == cp.Spec.Region {
-					cpConfig.LoadBalancerClasses = pool.LoadBalancerClasses
-					break
-				}
+			if pool.Region != nil && *pool.Region == cp.Spec.Region {
+				profileClasses = pool.LoadBalancerClasses
+				break
 			}
 		}
-
-		if cpConfig.LoadBalancerClasses == nil {
-			cpConfig.LoadBalancerClasses = fallback
-		}
 	}
 
-	found := false
-	for _, class := range cpConfig.LoadBalancerClasses {
-		if class.Name == api.DefaultLoadBalancerClass {
-			found = true
-			setDefaultLoadbalancerSpec(values, &class)
-		}
-	}
-	if len(cpConfig.LoadBalancerClasses) > 0 && !found {
-		setDefaultLoadbalancerSpec(values, &cpConfig.LoadBalancerClasses[0])
+	// if shoot does not specify classes, uses classes from profile
+	var classes []api.LoadBalancerClass
+	if cpConfig.LoadBalancerClasses == nil {
+		classes = append(profileClasses[:0:0], profileClasses...)
+	} else {
+		classes = append(cpConfig.LoadBalancerClasses[:0:0], cpConfig.LoadBalancerClasses...)
 	}
 
-	for _, class := range cpConfig.LoadBalancerClasses {
+	defaultClass := lookupLoadBalancerClass(classes, api.DefaultLoadBalancerClass, true)
+	if defaultClass != nil {
+		setDefaultLoadbalancerSpec(values, defaultClass)
+	}
+
+	for _, class := range classes {
 		if class.Name == api.PrivateLoadBalancerClass {
 			utils.SetStringValue(values, "subnetID", class.SubnetID)
 			break
 		}
 	}
 
+	// enforce existence of a VPN class according to settings purely from the profile
+	// the shoot creator MUST NOT be able to redefine the settings for the VPN Loadbalancer
+	// first: detect the VPN class from the profile
+	vpnClass := lookupLoadBalancerClass(profileClasses, api.VPNLoadBalancerClass, true)
+
+	// second: enforce the VPN class for the shoot
+	if vpnClass != nil {
+		vpnClass.Name = api.VPNLoadBalancerClass
+		found := false
+		for i, class := range classes {
+			if class.Name == api.VPNLoadBalancerClass {
+				classes[i] = *vpnClass
+				found = true
+				break
+			}
+		}
+		if !found {
+			classes = append(classes, *vpnClass)
+		}
+	} else {
+		// only test cases where no LoadBalancer Classes are configured
+	}
+
 	var floatingClasses []map[string]interface{}
-	for _, class := range cpConfig.LoadBalancerClasses {
+	for _, class := range classes {
 		floatingClass := map[string]interface{}{"name": class.Name}
 
 		if !utils.IsEmptyString(class.FloatingSubnetID) && utils.IsEmptyString(class.FloatingNetworkID) {
@@ -494,6 +513,25 @@ func getConfigChartValues(
 	}
 
 	return values, nil
+}
+
+func lookupLoadBalancerClass(classes []api.LoadBalancerClass, name string, defaulted bool) *api.LoadBalancerClass {
+	var found *api.LoadBalancerClass
+	var def *api.LoadBalancerClass
+	for i, class := range classes {
+		tmp := class
+		if defaulted && (i == 0 || class.Name == api.DefaultLoadBalancerClass) {
+			def = &tmp
+		}
+		if class.Name == name {
+			found = &tmp
+			break
+		}
+	}
+	if found == nil {
+		return def
+	}
+	return found
 }
 
 // setDefaultLoadbalancerSpec completes the default spec according to a dedicated load balancer class

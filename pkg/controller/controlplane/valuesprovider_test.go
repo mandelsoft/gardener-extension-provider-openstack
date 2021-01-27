@@ -50,10 +50,14 @@ const (
 var (
 	dhcpDomain     = pointer.StringPtr("dhcp-domain")
 	requestTimeout = pointer.StringPtr("2s")
+
+	floatingNetworkName = "FloatingNetwork"
+	defaultSubnetID     = "subnet-0815"
 )
 
 func defaultControlPlane() *extensionsv1alpha1.ControlPlane {
 	return controlPlane(
+		"floating-network-name",
 		"floating-network-id",
 		&api.ControlPlaneConfig{
 			LoadBalancerProvider: "load-balancer-provider",
@@ -65,7 +69,7 @@ func defaultControlPlane() *extensionsv1alpha1.ControlPlane {
 		})
 }
 
-func controlPlane(floatingPoolID string, cfg *api.ControlPlaneConfig) *extensionsv1alpha1.ControlPlane {
+func controlPlane(floatingPoolName, floatingPoolID string, cfg *api.ControlPlaneConfig) *extensionsv1alpha1.ControlPlane {
 	return &extensionsv1alpha1.ControlPlane{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "control-plane",
@@ -86,7 +90,8 @@ func controlPlane(floatingPoolID string, cfg *api.ControlPlaneConfig) *extension
 				Raw: encode(&api.InfrastructureStatus{
 					Networks: api.NetworkStatus{
 						FloatingPool: api.FloatingPoolStatus{
-							ID: floatingPoolID,
+							ID:   floatingPoolID,
+							Name: floatingPoolName,
 						},
 						Subnets: []api.Subnet{
 							{
@@ -127,6 +132,19 @@ var _ = Describe("ValuesProvider", func() {
 			UseOctavia:                 pointer.BoolPtr(useOctavia),
 			RescanBlockStorageOnResize: pointer.BoolPtr(rescanBlockStorageOnResize),
 			NodeVolumeAttachLimit:      pointer.Int32Ptr(nodeVoluemAttachLimit),
+			Constraints: api.Constraints{
+				FloatingPools: []api.FloatingPool{
+					api.FloatingPool{
+						Name: floatingNetworkName,
+						LoadBalancerClasses: []api.LoadBalancerClass{
+							api.LoadBalancerClass{
+								Name:     "default",
+								SubnetID: &defaultSubnetID,
+							},
+						},
+					},
+				},
+			},
 		}
 		cloudProfileConfigJSON, _ = json.Marshal(cloudProfileConfig)
 
@@ -291,6 +309,7 @@ var _ = Describe("ValuesProvider", func() {
 				subnetID          = "priv"
 				floatingSubnetID  = "default-floating-subnet-id"
 				cp                = controlPlane(
+					floatingNetworkName,
 					floatingNetworkID,
 					&api.ControlPlaneConfig{
 						LoadBalancerProvider: "load-balancer-provider",
@@ -346,6 +365,10 @@ var _ = Describe("ValuesProvider", func() {
 							"name":     "other",
 							"subnetID": subnetID,
 						},
+						{
+							"name":     api.VPNLoadBalancerClass,
+							"subnetID": defaultSubnetID,
+						},
 					},
 				})
 			)
@@ -365,6 +388,7 @@ var _ = Describe("ValuesProvider", func() {
 				subnetID           = "priv"
 				floatingSubnetName = "default-floating-subnet-*"
 				cp                 = controlPlane(
+					floatingNetworkName,
 					floatingNetworkID,
 					&api.ControlPlaneConfig{
 						LoadBalancerProvider: "load-balancer-provider",
@@ -418,6 +442,10 @@ var _ = Describe("ValuesProvider", func() {
 						{
 							"name":     "other",
 							"subnetID": subnetID,
+						},
+						{
+							"name":     api.VPNLoadBalancerClass,
+							"subnetID": defaultSubnetID,
 						},
 					},
 				})
