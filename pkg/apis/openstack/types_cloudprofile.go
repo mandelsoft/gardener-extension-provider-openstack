@@ -89,8 +89,10 @@ type KeyStoneURL struct {
 type LoadBalancerClass struct {
 	// Name is the name of the LB class
 	Name string
-	// FloatingSubnetPattern is a name pattern (glob) or direct name of a dedicated subnet in floating network pool.
-	FloatingSubnetPattern *string
+	// FloatingSubnetTags is a list of tags used to lookup valid floating subnets for the floating pool.
+	FloatingSubnetTags *string
+	// FloatingSubnetName is a name pattern (glob) or direct name of a dedicated subnet in floating network pool.
+	FloatingSubnetName *string
 	// FloatingSubnetID is the subnetwork ID of a dedicated subnet in floating network pool.
 	FloatingSubnetID *string
 	// FloatingNetworkID is the network ID of the floating network pool.
@@ -102,6 +104,12 @@ type LoadBalancerClass struct {
 
 func (in LoadBalancerClass) String() string {
 	result := fmt.Sprintf("Name: %q", in.Name)
+	if in.FloatingSubnetTags != nil {
+		result += fmt.Sprintf(", FloatingSubnetTags: %q", *in.FloatingSubnetTags)
+	}
+	if in.FloatingSubnetName != nil {
+		result += fmt.Sprintf(", FloatingSubnetName: %q", *in.FloatingSubnetName)
+	}
 	if in.FloatingSubnetID != nil {
 		result += fmt.Sprintf(", FloatingSubnetID: %q", *in.FloatingSubnetID)
 	}

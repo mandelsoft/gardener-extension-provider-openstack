@@ -359,12 +359,12 @@ var _ = Describe("ValuesProvider", func() {
 			c.EXPECT().Get(ctx, cpSecretKey, &corev1.Secret{}).DoAndReturn(clientGet(cpSecret))
 
 			var (
-				floatingNetworkID     = "4711"
-				fsid                  = "0815"
-				floatingSubnetID2     = "pub0815"
-				subnetID              = "priv"
-				floatingSubnetPattern = "default-floating-subnet-*"
-				cp                    = controlPlane(
+				floatingNetworkID  = "4711"
+				fsid               = "0815"
+				floatingSubnetID2  = "pub0815"
+				subnetID           = "priv"
+				floatingSubnetName = "default-floating-subnet-*"
+				cp                 = controlPlane(
 					floatingNetworkID,
 					&api.ControlPlaneConfig{
 						LoadBalancerProvider: "load-balancer-provider",
@@ -375,9 +375,9 @@ var _ = Describe("ValuesProvider", func() {
 								SubnetID:         nil,
 							},
 							{
-								Name:                  "default",
-								FloatingSubnetPattern: &floatingSubnetPattern,
-								SubnetID:              nil,
+								Name:               "default",
+								FloatingSubnetName: &floatingSubnetName,
+								SubnetID:           nil,
 							},
 							{
 								Name:             "public",
@@ -398,8 +398,8 @@ var _ = Describe("ValuesProvider", func() {
 				)
 
 				configValues = utils.MergeMaps(configChartValues, map[string]interface{}{
-					"floatingNetworkID":     floatingNetworkID,
-					"floatingSubnetPattern": floatingSubnetPattern,
+					"floatingNetworkID":  floatingNetworkID,
+					"floatingSubnetName": floatingSubnetName,
 					"floatingClasses": []map[string]interface{}{
 						{
 							"name":              "test",
@@ -407,8 +407,8 @@ var _ = Describe("ValuesProvider", func() {
 							"floatingSubnetID":  fsid,
 						},
 						{
-							"name":                  "default",
-							"floatingSubnetPattern": floatingSubnetPattern,
+							"name":               "default",
+							"floatingSubnetName": floatingSubnetName,
 						},
 						{
 							"name":              "public",

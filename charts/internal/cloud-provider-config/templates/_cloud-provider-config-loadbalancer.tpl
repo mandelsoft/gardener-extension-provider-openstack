@@ -11,8 +11,11 @@ use-octavia="{{ .Values.useOctavia }}"
 {{- if .Values.floatingSubnetID }}
 floating-subnet-id="{{ .Values.floatingSubnetID }}"
 {{- end }}
-{{- if .Values.floatingSubnetPattern }}
-floating-subnet-pattern="{{ .Values.floatingSubnetPattern }}"
+{{- if .Values.floatingSubnetName }}
+floating-subnet="{{ .Values.floatingSubnetName }}"
+{{- end }}
+{{- if .Values.floatingSubnetTags }}
+floating-subnet-tags="{{ .Values.floatingSubnetTags }}"
 {{- end }}
 {{- if .Values.subnetID }}
 subnet-id="{{ .Values.subnetID }}"

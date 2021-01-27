@@ -481,7 +481,8 @@ func getConfigChartValues(
 			utils.SetStringValue(floatingClass, "floatingNetworkID", class.FloatingNetworkID)
 		}
 
-		utils.SetStringValue(floatingClass, "floatingSubnetPattern", class.FloatingSubnetPattern)
+		utils.SetStringValue(floatingClass, "floatingSubnetTags", class.FloatingSubnetTags)
+		utils.SetStringValue(floatingClass, "floatingSubnetName", class.FloatingSubnetName)
 		utils.SetStringValue(floatingClass, "floatingSubnetID", class.FloatingSubnetID)
 		utils.SetStringValue(floatingClass, "subnetID", class.SubnetID)
 
@@ -497,7 +498,8 @@ func getConfigChartValues(
 
 // setDefaultLoadbalancerSpec completes the default spec according to a dedicated load balancer class
 func setDefaultLoadbalancerSpec(values map[string]interface{}, class *api.LoadBalancerClass) {
-	utils.SetStringValue(values, "floatingSubnetPattern", class.FloatingSubnetPattern)
+	utils.SetStringValue(values, "floatingSubnetTags", class.FloatingSubnetTags)
+	utils.SetStringValue(values, "floatingSubnetName", class.FloatingSubnetName)
 	utils.SetStringValue(values, "floatingSubnetID", class.FloatingSubnetID)
 	utils.SetStringValue(values, "subnetID", class.SubnetID)
 }
